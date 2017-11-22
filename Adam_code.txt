@@ -1,0 +1,24 @@
+;; Adam (Adaptive Moment Estimation): gradient descent optimization algorithm
+
+(def beta_1 0.9)
+(def beta_2 0.999)
+(def epsilon (pow 10 -8))
+
+(defn mt_hat [mt t grad_m] (/ (+ (* beta_1 mt) (* (- 1 beta_1) grad_m)) (- 1 (pow beta_1 t))))
+  
+(defn vt_hat [vt t grad_m] (/ (+ (* beta_2 vt) (* (- 1 beta_2) (pow grad_m 2))) (- 1 (pow beta_2 t))))
+
+; would it be better to write up all in one, to avoid recomputation of d/dm(F)?
+; or will the LMH algorithm take care of recomputation?
+
+(defn adam
+  [m0 number-of-iterations mt vt eta]
+  (loop [m m0 k number-of-iterations]
+    (if (= k 0)
+      m
+      (recur 
+        (let [m_est (sampling m sigma 100)]
+          (+ m (* eta (/ (mt_hat mt k m_est) (pow (+ (vt_hat vt k m_est) epsilon) 0.5)))))
+        (- k 1))))) ;; sampling size: 100
+  
+  
