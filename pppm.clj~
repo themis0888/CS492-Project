@@ -129,6 +129,7 @@
 ;; **
 ;;; The Derivation of the Logarithm-Term is given by:
 ;;; $$ 		\frac{d}{dm} \log p_m (x)  = 	\frac{d}{dm} \left( - \frac{(x-m)^2}{2\sigma^2}	\right) = \frac{x-m}{\sigma ^2}	$$
+;;; $$ \frac{d}{d\sigma} \log p_m,\simga (x)
 ;; **
 
 ;; @@

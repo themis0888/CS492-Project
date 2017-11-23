@@ -22,7 +22,7 @@
 ;; <=
 
 ;; **
-;;; 1. Problem Formulation
+;;; |1. Problem Formulation
 ;;; ============
 ;;; Goal
 ;;; ----
@@ -127,8 +127,9 @@
 
 ;; **
 ;;; The Derivation of the Logarithm-Term is given by:
-;;; $$ 		\frac{d}{dm} \log p_m,\sigma (x)  = 	\frac{d}{dm} \left( - \frac{(x-m)^2}{2\sigma^2}	\right) = \frac{x-m}{\sigma ^2}	$$
-;;; $$ 		\frac{d}{d \sigma} \log p_m,\sigma (x)  = 	\frac{d}{d\sigma} \left( - \frac{(x-m)^2}{2\sigma^2} + log(\frac{1}{\sqrt {2\pi} \sigma}\right) = \frac{(x-m)^2}{\sigma^3} - \frac{1}{\sigma} $$
+;;; $$ 		\frac{d}{dm} \log p_{ m,\sigma}(x)  = 	\frac{d}{dm} \left( - \frac{(x-m)^2}{2\sigma^2}	\right) = \frac{x-m}{\sigma ^2}	$$
+;;; 
+;;; $$ 		\frac{d}{d \sigma} \log p_{ m,\sigma}(x)  = \frac{d}{d\sigma} \left( - \frac{(x-m)^2}{2\sigma^2} + log(\frac{1}{\sqrt {2\pi} \sigma}\right) = \frac{(x-m)^2}{\sigma^3} - \frac{1}{\sigma} $$
 ;;; 
 ;; **
 
@@ -136,9 +137,12 @@
 ; Partial Derivative of gpdf wrt mu: d/dm log(p_m (x))
 (defn dm_loggdpf [m sigma x]
   (/ (- x m) (pow sigma 2)) )
+(defn dsig_loggdpf [m sigma x]
+  (- (/ (pow (- x m) 2) (pow sigma 3)) (/ 1 sigma)))
+
 ;; @@
 ;; =>
-;;; {"type":"html","content":"<span class='clj-var'>#&#x27;ppp/dm_loggdpf</span>","value":"#'ppp/dm_loggdpf"}
+;;; {"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/dm_loggdpf</span>","value":"#'ppp/dm_loggdpf"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/dsig_loggdpf</span>","value":"#'ppp/dsig_loggdpf"}],"value":"[#'ppp/dm_loggdpf,#'ppp/dsig_loggdpf]"}
 ;; <=
 
 ;; **
@@ -173,16 +177,19 @@
 
 ;; @@
 ; Query to sample f(x)d/dm log pm(x) with x~pm(x), pm normal(m,sigma)
-(with-primitive-procedures [dm_loggdpf
-                            target]
-  (defquery obj-func [m sigma]
+(with-primitive-procedures [dm_loggdpf target]
+  (defquery obj-func-m [m sigma]
     (let [x (sample (normal m sigma))]
       (* (target x) (dm_loggdpf m sigma x)))) )
 
+(with-primitive-procedures [dsig_loggdpf target]
+  (defquery obj-func-sig [m sigma]
+    (let [x (sample (normal m sigma))]
+      (* (target x) (dsig_loggdpf m sigma x)))) )
 
 ;; @@
 ;; =>
-;;; {"type":"html","content":"<span class='clj-var'>#&#x27;ppp/obj-func</span>","value":"#'ppp/obj-func"}
+;;; {"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/obj-func-m</span>","value":"#'ppp/obj-func-m"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/obj-func-sig</span>","value":"#'ppp/obj-func-sig"}],"value":"[#'ppp/obj-func-m,#'ppp/obj-func-sig]"}
 ;; <=
 
 ;; **
@@ -195,18 +202,24 @@
 ;; @@
 ; FUNCTION that executes the query and returns the expectation of the sampling approximation
 ; Input: m .. mean, sigma .. standard deviation, n .. size of samples
-(defn sampling [m sigma n]
-  (let [lazy-samples (doquery :lmh obj-func [m sigma])
+(defn sampling-m [m sigma n]
+  (let [lazy-samples (doquery :lmh obj-func-m [m sigma])
         samples (map :result (take n  (take 10000 (drop 1000 lazy-samples))))]
     (/ (reduce + samples) n)))
 
+(defn sampling-sig [m sigma n]
+  (let [lazy-samples (doquery :lmh obj-func-sig [m sigma])
+        samples (map :result (take n  (take 10000 (drop 1000 lazy-samples))))]
+    (/ (reduce + samples) n)))
+
+
 ;; @@
 ;; =>
-;;; {"type":"html","content":"<span class='clj-var'>#&#x27;ppp/sampling</span>","value":"#'ppp/sampling"}
+;;; {"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/sampling-m</span>","value":"#'ppp/sampling-m"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/sampling-sig</span>","value":"#'ppp/sampling-sig"}],"value":"[#'ppp/sampling-m,#'ppp/sampling-sig]"}
 ;; <=
 
 ;; **
-;;; 4 . Hill-Climbing:
+;;; (4 . Hill-Climbing:
 ;;; 
 ;;; Initialize: @@ \sigma @@, @@ m_0 @@ @@ \alpha @@
 ;; **
@@ -214,23 +227,26 @@
 ;; @@
 
 ;; Initial Values
-(def sigma 0.0001)
-(def m0 2)
-(def alpha 0.3)
+(def sigma0 0.0001)
+(def m0 3)
+(def alpha-m 0.2)
+(def alpha-sig 0.001)
 (def crit-val 0.000001)
 
-(def number-of-iterations 100)
+(def number-of-iterations 200)
 
 ;; @@
 ;; =>
-;;; {"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/sigma</span>","value":"#'ppp/sigma"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/m0</span>","value":"#'ppp/m0"}],"value":"[#'ppp/sigma,#'ppp/m0]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/alpha</span>","value":"#'ppp/alpha"}],"value":"[[#'ppp/sigma,#'ppp/m0],#'ppp/alpha]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/crit-val</span>","value":"#'ppp/crit-val"}],"value":"[[[#'ppp/sigma,#'ppp/m0],#'ppp/alpha],#'ppp/crit-val]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/number-of-iterations</span>","value":"#'ppp/number-of-iterations"}],"value":"[[[[#'ppp/sigma,#'ppp/m0],#'ppp/alpha],#'ppp/crit-val],#'ppp/number-of-iterations]"}
+;;; {"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"list-like","open":"","close":"","separator":"</pre><pre>","items":[{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/sigma0</span>","value":"#'ppp/sigma0"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/m0</span>","value":"#'ppp/m0"}],"value":"[#'ppp/sigma0,#'ppp/m0]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/alpha-m</span>","value":"#'ppp/alpha-m"}],"value":"[[#'ppp/sigma0,#'ppp/m0],#'ppp/alpha-m]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/alpha-sig</span>","value":"#'ppp/alpha-sig"}],"value":"[[[#'ppp/sigma0,#'ppp/m0],#'ppp/alpha-m],#'ppp/alpha-sig]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/crit-val</span>","value":"#'ppp/crit-val"}],"value":"[[[[#'ppp/sigma0,#'ppp/m0],#'ppp/alpha-m],#'ppp/alpha-sig],#'ppp/crit-val]"},{"type":"html","content":"<span class='clj-var'>#&#x27;ppp/number-of-iterations</span>","value":"#'ppp/number-of-iterations"}],"value":"[[[[[#'ppp/sigma0,#'ppp/m0],#'ppp/alpha-m],#'ppp/alpha-sig],#'ppp/crit-val],#'ppp/number-of-iterations]"}
 ;; <=
 
 ;; **
 ;;; Repeat:
 ;;; 
-;;; $$ m_1 \leftarrow m_0 + \alpha \left( \frac{d}{dm} F \right) (m_0) $$
-;;; $$ m_2 \leftarrow m_1 + \alpha \left( \frac{d}{dm} F \right) (m_1) $$
+;;; $$ m_1, \sigma_1\leftarrow m_0 + \alpha_m \left( \frac{d}{dm} F \right) (m_0),  \sigma_0 + \beta \left( \frac{d}{d\sigma} F \right) (\sigma_0)  $$
+;;; 
+;;; $$ m_2, \sigma_2 \leftarrow m_1 + \alpha_m \left( \frac{d}{dm} F \right) (m_1),  \sigma_0 + \beta \left( \frac{d}{d\sigma} F \right) (\sigma_0)  $$
+;;; 
 ;;; $$	\vdots	$$
 ;;; 
 ;; **
@@ -238,14 +254,20 @@
 ;; @@
 ;; FUNCTION: Hillclimbing
 ;; Input: m0 .. initial value, number-of-iterations .. number of iterations
+;; Run until it converge or iterate enough time 
 (defn hill-climbing
-  [m0 number-of-iterations]
-  (loop [m m0 k number-of-iterations]
-    (if (= k 0)
-      m
-      (if (< (sampling m sigma 100) crit-val) 
-        m
-        (recur (+ m (* alpha (sampling m sigma 100))) (- k 1)))))) ;; sampling size: 100
+  [m0 sigma0 number-of-iterations]
+  (loop [m m0 sigma sigma0 k number-of-iterations]
+    (if (or (= k 0) 
+            (< (abs (* alpha-m (sampling-m m sigma 100))) crit-val))
+            ;(< (abs (* alpha-sig (sampling-sig m sigma 100))) crit-val))
+      m ;(list m sigma)
+      (recur (+ m (* alpha-m (sampling-m m sigma 100))) 
+             sigma ;(+ sigma (* alpha-sig (sampling-sig m sigma 100)))
+             (- k 1)))))
+            
+
+;; sampling size: 100
 
 ;; @@
 ;; =>
@@ -258,10 +280,10 @@
 
 ;; @@
 ;; Just for comparison, we execute hill-climbing several times.
-(take 5 (repeatedly #(hill-climbing m0 number-of-iterations)))
+(take 5 (repeatedly #(hill-climbing m0 sigma0 number-of-iterations)))
 ;; @@
 ;; =>
-;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-double'>1.9999982582297677</span>","value":"1.9999982582297677"},{"type":"html","content":"<span class='clj-double'>2.0000032688489093</span>","value":"2.0000032688489093"},{"type":"html","content":"<span class='clj-double'>1.999997488878641</span>","value":"1.999997488878641"},{"type":"html","content":"<span class='clj-double'>1.9999950771560482</span>","value":"1.9999950771560482"},{"type":"html","content":"<span class='clj-double'>2.000017769017796</span>","value":"2.000017769017796"}],"value":"(1.9999982582297677 2.0000032688489093 1.999997488878641 1.9999950771560482 2.000017769017796)"}
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-double'>1.9999978565687073</span>","value":"1.9999978565687073"},{"type":"html","content":"<span class='clj-double'>2.000003689508931</span>","value":"2.000003689508931"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-double'>2.000001587669478</span>","value":"2.000001587669478"},{"type":"html","content":"<span class='clj-double'>2.000000565543189</span>","value":"2.000000565543189"}],"value":"(1.9999978565687073 2.000003689508931 2 2.000001587669478 2.000000565543189)"}
 ;; <=
 
 ;; @@
@@ -282,7 +304,7 @@
 ;;; 
 ;;; * Distribution:
 ;;; 
-;;; Including @@ \sigma @@ as second parameter.
+;;; Including @@ \sigma @@ as second parameter. - Going on 
 ;;; 
 ;;; * Target function:
 ;;; 
